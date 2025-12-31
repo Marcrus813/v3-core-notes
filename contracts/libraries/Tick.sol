@@ -127,6 +127,7 @@ library Tick {
 
         require(liquidityGrossAfter <= maxLiquidity, 'LO');
 
+        // NOTE: flipped means whether the liquidity at this tick is switched on or switched off, that is from non-zero to zero or from zero to non-zero
         flipped = (liquidityGrossAfter == 0) != (liquidityGrossBefore == 0);
 
         if (liquidityGrossBefore == 0) {

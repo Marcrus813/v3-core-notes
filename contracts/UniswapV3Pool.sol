@@ -392,6 +392,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         bool flippedLower;
         bool flippedUpper;
         if (liquidityDelta != 0) {
+            // NOTE: Oracle stuff
             uint32 time = _blockTimestamp();
             (int56 tickCumulative, uint160 secondsPerLiquidityCumulativeX128) =
                 observations.observeSingle(
@@ -403,6 +404,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
                     slot0.observationCardinality
                 );
 
+            // NOTE: Update the info on the tick, initialize the tick if liquidity of it was 0, update its liquidity net
             flippedLower = ticks.update(
                 tickLower,
                 tick,
@@ -428,6 +430,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
                 maxLiquidityPerTick
             );
 
+            // NOTE: Flip the tick on or off
             if (flippedLower) {
                 tickBitmap.flipTick(tickLower, tickSpacing);
             }
@@ -439,6 +442,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) =
             ticks.getFeeGrowthInside(tickLower, tickUpper, tick, _feeGrowthGlobal0X128, _feeGrowthGlobal1X128);
 
+        // NOTE: Fee related updates
         position.update(liquidityDelta, feeGrowthInside0X128, feeGrowthInside1X128);
 
         // clear any tick data that is no longer needed
@@ -533,6 +537,7 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
         amount1 = uint256(-amount1Int);
 
         if (amount0 > 0 || amount1 > 0) {
+            // NOTE: No direct transfer
             (position.tokensOwed0, position.tokensOwed1) = (
                 position.tokensOwed0 + uint128(amount0),
                 position.tokensOwed1 + uint128(amount1)
@@ -764,6 +769,15 @@ contract UniswapV3Pool is IUniswapV3Pool, NoDelegateCall {
             if (state.protocolFee > 0) protocolFees.token1 += state.protocolFee;
         }
 
+        // zero for one | exact input |
+        //     true     |     true    | amount0 = specified - remaining (> 0)
+        //                            | amount1 = calculated            (< 0)
+        //     false    |     false   | amount0 = specified - remaining (> 0)
+        //                            | amount1 = calculated            (< 0)
+        //     true     |     false   | amount0 = calculated            (> 0)
+        //                            | amount1 = specified - remaining (< 0)
+        //     false    |     true    | amount0 = calculated            (< 0)
+        //                            | amount1 = specified - remaining (> 0)
         (amount0, amount1) = zeroForOne == exactInput
             ? (amountSpecified - state.amountSpecifiedRemaining, state.amountCalculated)
             : (state.amountCalculated, amountSpecified - state.amountSpecifiedRemaining);
